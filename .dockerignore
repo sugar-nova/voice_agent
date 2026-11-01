@@ -1,0 +1,25 @@
+# Git and local env
+.git
+.gitignore
+.env
+.venv
+venv
+
+# Client (not in server image)
+client/node_modules
+client/dist
+
+# Python artifacts
+**/__pycache__
+**/*.pyc
+.pytest_cache
+*.egg-info
+
+# Bench / temp
+tmp
+artifacts
+_vite-scaffold
+
+# IDE
+.cursor
+.claude-plugin

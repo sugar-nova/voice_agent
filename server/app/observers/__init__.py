@@ -1,0 +1,1 @@
+"""Pipeline observers (latency, logging)."""

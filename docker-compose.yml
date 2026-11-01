@@ -1,0 +1,14 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    env_file:
+      - path: config/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      PORT: "${PORT:-8000}"

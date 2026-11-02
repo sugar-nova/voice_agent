@@ -50,28 +50,39 @@ async def check_deepgram(settings: Settings) -> int:
 
     t0 = time.perf_counter()
     first_interim_ms: float | None = None
-    final_ms: float | None = None
+    first_final_ms: float | None = None
+    last_final_ms: float | None = None
     final_transcript = ""
-    done = asyncio.Event()
+    stream_closed = asyncio.Event()
+    receive_error: Exception | None = None
 
     async def receive_loop(connection) -> None:
-        nonlocal first_interim_ms, final_ms, final_transcript
-        async for message in connection:
-            if not isinstance(message, ListenV1Results):
-                continue
-            channel = message.channel
-            if not channel or not channel.alternatives:
-                continue
-            text = (channel.alternatives[0].transcript or "").strip()
-            if not text:
-                continue
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            if message.is_final:
-                final_ms = elapsed_ms
-                final_transcript = text
-                done.set()
-            elif first_interim_ms is None:
-                first_interim_ms = elapsed_ms
+        nonlocal first_interim_ms, first_final_ms, last_final_ms, final_transcript, receive_error
+        try:
+            async for message in connection:
+                if not isinstance(message, ListenV1Results):
+                    continue
+                channel = message.channel
+                if not channel or not channel.alternatives:
+                    continue
+                text = (channel.alternatives[0].transcript or "").strip()
+                if not text:
+                    continue
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                if message.is_final:
+                    if first_final_ms is None:
+                        first_final_ms = elapsed_ms
+                    last_final_ms = elapsed_ms
+                    # Keep the most complete text if service emits multiple finals.
+                    if len(text) >= len(final_transcript):
+                        final_transcript = text
+                elif first_interim_ms is None and first_final_ms is None:
+                    # Ignore interim chunks that arrive after the first final.
+                    first_interim_ms = elapsed_ms
+        except Exception as exc:  # websocket close path can raise after finalize
+            receive_error = exc
+        finally:
+            stream_closed.set()
 
     print(f"Deepgram STT (streaming) fixture={FIXTURE.name} sample_rate={sample_rate}")
     async with client.listen.v1.connect(
@@ -89,21 +100,27 @@ async def check_deepgram(settings: Settings) -> int:
             await asyncio.sleep(0.02)
         await connection.send_finalize()
         try:
-            await asyncio.wait_for(done.wait(), timeout=30.0)
+            await asyncio.wait_for(stream_closed.wait(), timeout=30.0)
         except TimeoutError:
-            print("Timed out waiting for final Deepgram transcript", file=sys.stderr)
+            print("Timed out waiting for Deepgram stream close", file=sys.stderr)
             receiver.cancel()
             return 1
-        finally:
-            receiver.cancel()
 
     print(f"  transcript (final): {final_transcript!r}")
     if first_interim_ms is not None:
         print(f"  time_to_first_interim_ms: {first_interim_ms:.1f}")
     else:
         print("  time_to_first_interim_ms: (none)")
-    if final_ms is not None:
-        print(f"  time_to_final_ms: {final_ms:.1f}")
+    if first_final_ms is not None:
+        print(f"  time_to_first_final_ms: {first_final_ms:.1f}")
+    if last_final_ms is not None:
+        print(f"  time_to_final_ms: {last_final_ms:.1f}")
+    if receive_error and not final_transcript:
+        print(f"Deepgram stream error: {receive_error}", file=sys.stderr)
+        return 1
+    if not final_transcript:
+        print("No final Deepgram transcript received", file=sys.stderr)
+        return 1
     return 0
 
 

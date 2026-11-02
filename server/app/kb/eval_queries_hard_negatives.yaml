@@ -1,0 +1,50 @@
+- text: Where is my money right now?
+  in_scope: true
+  expected_faq_id: where_is_money
+
+- text: The transfer tracker still says processing, what is happening?
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: It says sent but my recipient still has not received anything
+  in_scope: true
+  expected_faq_id: sent_not_arrived
+
+- text: Can I get a transfer receipt to prove I paid?
+  in_scope: true
+  expected_faq_id: proof_of_payment
+
+- text: I need the transfer reference to share with the recipient bank
+  in_scope: true
+  expected_faq_id: reference_number
+
+# Hard negatives: intentionally similar wording but out of KB scope.
+- text: Where is my refund from a card chargeback?
+  in_scope: false
+
+- text: Why is my Wise card payment still pending?
+  in_scope: false
+
+- text: My balance transfer is delayed, where is my money?
+  in_scope: false
+
+- text: Where is my salary payment to Wise account?
+  in_scope: false
+
+- text: Why is my account verification still processing?
+  in_scope: false
+
+- text: My money is stuck because I cannot log in, what do I do?
+  in_scope: false
+
+- text: Where is my crypto withdrawal?
+  in_scope: false
+
+- text: Why is my transfer blocked by compliance review on my account?
+  in_scope: false
+
+- text: I sent money with another app, can you track it?
+  in_scope: false
+
+- text: Where is my money from a cancelled card payment?
+  in_scope: false

@@ -232,6 +232,112 @@ Build **latency observer early** (plan §6): you need `t0`–`t4` before tuning 
 
 ---
 
+## Milestone 4B — Knowledge brain (**L1 delivery now**; L2 deferred)
+
+Replace the echo agent with a **scoped FAQ brain**. Source of truth = the Wise **"Where is my money"** help section only ([link](https://wise.com/help/topics/5bVKT0uQdBrDp6T62keyfz/sending-money)).
+
+**Phase 1B focus (ship now):**
+
+- **Layer 1 — Redis Stack semantic router:** embed the user query; KNN against **engineered question variants** (`embedded_questions` per intent in `faqs.yaml`). If similarity **≥ `BRAIN_L1_THRESHOLD`** (baseline **0.95**, tune with `scripts/eval_l1_threshold.py`), return the voice-optimized answer **straight to TTS** (no LLM).
+- **Out-of-scope gate:** any query below threshold (with `BRAIN_ENABLE_L2=false`) → deflect handoff + end session.
+
+**Layer 2 (implemented, opt-in):** Qdrant retrieval + streamed local-LLM answers for in-scope questions L1 misses (`BRAIN_ENABLE_L2=true`). Steps **M4B-08–M4B-12** are under **Layer 2** below. Still open for L2: browser E2E of the `l2_rag` path (M4B-17) and L2 latency rows (M4B-22, M5-11–M5-13).
+
+**Strict requirement:** the bot answers only questions in the "Where is my money" section. **Any other question → deflect to a human** (short handoff line, then cut the call).
+
+> **KB engineering:** Q→A routing — embed **questions only**, store one spoken answer payload per intent. See `docs/kb-scope.md` and hard-negative fixtures in `server/app/kb/eval_queries_hard_negatives.yaml`.
+
+### M4B — Knowledge base and scope
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M4B-01** | Define the **in-scope boundary**: enumerate the subtopics/questions under the Wise "Where is my money" section. Write `docs/kb-scope.md` listing in-scope intents **and** explicit out-of-scope examples. | A reviewer can classify any question as in/out of scope from the doc alone. |
+| **M4B-02** | Curate KB into `server/app/kb/faqs.yaml`: per intent `id`, `question`, **`embedded_questions`** (5+ variants), voice `answer`, `tags`/`category`. | File parses; entries cover the section; loader supports variants. |
+| **M4B-03** | Pick + **pin** an embedding model/provider; add its var(s) (e.g. `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, key) to `config/.env.example`. | One-line script embeds a string and prints the vector dim. |
+
+### M4B — Layer 1: Redis semantic router
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M4B-04** | Add **Redis Stack** (docker-compose service or local) + pinned client dep. | `PING` → `PONG`; RediSearch module present. |
+| **M4B-05** | `scripts/build_redis_index.py`: `PING` + RediSearch module check; `FT.CREATE` vector index; embed each **question variant**; store vector + metadata (`faq_id`, answer payload). | Index populated; row count = total `embedded_questions`; `FT.INFO` ok. |
+| **M4B-06** | Router lookup: embed query → **Redis `FT.SEARCH` KNN** (not in-process matrix when Redis is configured) → best match + similarity. | Unit/integration test: canonical + variant queries return expected `faq_id`. |
+| **M4B-07** | Threshold gate: sim **≥ `BRAIN_L1_THRESHOLD`** (default **0.95**) → stored answer on **straight-to-TTS** path (no LLM). Tune with `scripts/eval_l1_threshold.py` (+ hard-negative YAML). | Paraphrase above threshold → stored answer; hard negative below → deflect path. |
+
+### Layer 2: Qdrant retrieval + local LLM *(implemented; enable with `BRAIN_ENABLE_L2=true`)*
+
+L1 misses go to L2: retrieve the top 3 FAQ chunks from Qdrant, then a **local Ollama model** answers only from those chunks or replies `NOT_COVERED` (→ deflect). Code: `server/app/brain/l2.py`, `qdrant_store.py`, `llm.py`, `decision.py`. Evaluate end to end with `python scripts/eval_brain_routes.py`.
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M4B-08** | Add **Qdrant** (docker-compose) + pinned client dep. | Collection API reachable; health ok. *(Done: compose service `qdrant/qdrant:v1.12.5`, `qdrant-client==1.12.1` in `server[brain]`. Falls back to in-memory with a logged warning when Qdrant is down.)* |
+| **M4B-09** | Chunk + embed FAQ content into a Qdrant collection with **metadata payload** (category, subtopic, source `id`). | Collection count > 0; a filtered search returns the expected chunk. *(Done: one chunk per intent = all `embedded_questions` + answer; payload `faq_id`, `category`, `tags`, `question`, `answer`. Upserted on startup by `faq_id`; dropped FAQs are deleted. Test: `tests/test_qdrant_store.py`.)* |
+| **M4B-10** | Retrieval fn (top-k + metadata filter + score), invoked only when L1 sim < threshold. | A combined in-scope question returns relevant chunks. *(Done: top-3 by cosine, reusing the L1 query embedding. No metadata filter — there is no per-query signal to filter on with 10 intents.)* |
+| **M4B-11** | Pick + **pin** an LLM provider; stream synthesis from retrieved context with a guardrail prompt ("answer **only** from context; if not covered, say out of scope"). | Streams tokens; answer is grounded in the retrieved context. *(Done: Ollama `qwen2.5:3b` (`OLLAMA_MODEL`), temperature 0. Chosen over 7b (≈2× slower first token, 1 out-of-scope accepted) and 1.5b (8/20 out-of-scope accepted, invented details). Streamed to TTS sentence by sentence.)* |
+| **M4B-12** | L2 relevance floor: top Qdrant score below threshold **or** LLM signals "not covered" → mark **out-of-scope**. | A clearly unrelated question is flagged out-of-scope. *(Done: `BRAIN_L2_RELEVANCE_FLOOR=0.60` skips the LLM for obvious misses; `NOT_COVERED` or an LLM error → deflect.)* |
+
+**L2 eval (2026-11-02, `eval_brain_routes.py`, both fixture files, L1 in-memory, L2 in-memory retriever):**
+
+| L1 threshold | L2 | In-scope answered (of 22) | Out-of-scope answered (of 20) | L2 first token p50 |
+|---|---|---|---|---|
+| 0.90 | qwen2.5:3b | 21 | **0** | 412 ms |
+| 0.85 | qwen2.5:3b | 22 | 3 (answered by L1 before L2 runs) | 426 ms |
+
+### M4B — Scope gate and human deflection
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M4B-13** | Combine gates: L1 hit → stored answer; else (L2 off) → deflect. With L2 on later: L2 in-scope → synthesized answer. | **L1 ship:** two paths (`l1_hit`, `deflect`) on fixtures; L2 path when deferred steps done. |
+| **M4B-14** | **Deflection**: on out-of-scope, speak one fixed handoff line (e.g. *"I can only help with questions about where your money is — let me connect you to a human. Goodbye."*) via TTS, then **end the session / close the WS (cut the call)**. | Out-of-scope question → handoff line played → session closes cleanly. |
+
+### M4B — Pipeline integration
+
+| ID | Step | Depends on |
+|----|------|------------|
+| **M4B-15** | Implement `KnowledgeProcessor` (Pipecat processor) wrapping the decision logic; swap it for `EchoProcessor` in `build_pipeline(...)` behind a config flag (`agent=echo\|brain`). | Pipeline builds with the brain agent; flag switches back to echo. |
+| **M4B-16** | Route L1 hits **straight to TTS** (skip LLM). *(L2: stream synthesized answers when M4B-11 done.)* | L1 turns use fixed answer text only; no LLM frames on L1 path. |
+| **M4B-17** | **L1 E2E** over WebSocket (`AGENT_MODE=brain`, `BRAIN_ENABLE_L2=false`): in-scope paraphrase → spoken stored answer; out-of-scope → handoff + WS closes. *(Later: combined in-scope → L2.)* | Two paths verified in browser; notes in `docs/latency-log.md`. |
+
+### M4B — Brain query performance metrics
+
+Per-turn and offline baselines for the dual-layer stack. Reuse the M1 latency observer: keep `t0`–`t4` / `t5` for pipeline latency; add a **`brain`** block on the same `metrics` JSON line and WS event.
+
+| Field | When set | Meaning |
+|-------|----------|---------|
+| `route` | Every brain turn | `l1_hit` \| `l2_rag` \| `deflect` |
+| `embed_ms` | L1 or L2 | Query embedding latency (provider or local model) |
+| `redis_knn_ms` | L1 hit (always attempted before L2) | Redis vector KNN only (target ~1–2 ms local, excluding embed) |
+| `redis_similarity` | After Redis KNN | Best-match cosine similarity |
+| `qdrant_search_ms` | L2 only | Qdrant filtered vector search only |
+| `llm_first_token_ms` | L2 only | Time from LLM request to first token |
+| `brain_ms` | Every brain turn | Final transcript received → agent answer text ready (replaces echo “logic” slice for `agent=brain`) |
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M4B-18** | Extend server `MetricsMessage` / `metrics_payload` and client types: optional `brain` object with fields above; echo turns omit `brain`. | Types compile; documented next to `LatencyStages`. |
+| **M4B-19** | Instrument L1: time `embed_ms` + `redis_knn_ms` around the router; set `route=l1_hit` when threshold passes. | Unit test: mock Redis client → non-null timings on fixture query. |
+| **M4B-20** | **L1 ship:** deflect metrics (`route=deflect`, L2 fields null). *(Deferred:* L2 shape with `qdrant_search_ms` + `llm_first_token_ms`.) | Fixture deflect + L1 hit produce distinct `route` + fields. |
+| **M4B-21** | `KnowledgeProcessor` attaches `brain` to WS `metrics`; client panel shows last turn `brain` fields. *(Optional polish:* merge `brain` into stdout turn JSON.) | Speak one L1 question → panel shows `route=l1_hit`, `redis_knn_ms`, `redis_similarity`. |
+| **M4B-22** | **L1 ship:** `scripts/bench_brain_queries.py` (or extend): warm Redis; run L1 + deflect fixtures **without** STT/TTS; print p50/p95 for `embed_ms`, `redis_knn_ms`, `brain_ms`. | Script exits 0; baseline row in `docs/latency-log.md` (Qdrant column n/a). |
+
+### M4B — L1-only acceptance checklist *(pass/fail before closing 4B)*
+
+Run with `AGENT_MODE=brain`, `BRAIN_ENABLE_L2=false`, Redis Stack up, index built (`python scripts/build_redis_index.py`).
+
+| # | Check | Pass when |
+|---|--------|-----------|
+| 1 | **Index health** | `build_redis_index.py` exits 0; RediSearch module present; indexed rows = count of all `embedded_questions`. |
+| 2 | **Offline routing** | `eval_l1_threshold.py` on standard + hard-negative YAML: chosen threshold gives **100% precision** on out-of-scope fixtures (no false accepts). |
+| 3 | **In-scope E2E** | Browser: paraphrase of a KB intent → spoken stored answer; WS `metrics.extra.brain.route` = `l1_hit`; similarity ≥ threshold. |
+| 4 | **Deflect E2E** | Browser: clearly out-of-scope question → handoff line spoken → session closes within ~8s (WS disconnect). `route=deflect`. |
+| 5 | **No LLM on L1 path** | L1 turn completes with fixed FAQ text only (no streamed LLM tokens); `llm_first_token_ms` absent/null. |
+| 6 | **Latency sanity** | One L1 turn: `redis_knn_ms` present; offline bench p50 `redis_knn_ms` documented (target ~1–5 ms local excluding embed). |
+| 7 | **Flag rollback** | `AGENT_MODE=echo` restores echo agent without code changes. |
+
+**Milestone 4B acceptance (L1 ship):** checklist **1–7** pass + **M4B-01–M4B-07**, **M4B-13–M4B-17** (two-path E2E), **M4B-14**, **M4B-21** (WS brain metrics). **Not required for L1 close:** M4B-08–M4B-12, M4B-11, full three-path E2E, Qdrant columns in latency-log.
+
+---
+
 ## Milestone 5 — Latency tuning and benchmark
 
 ### M5 — Measurement harness
@@ -240,7 +346,7 @@ Build **latency observer early** (plan §6): you need `t0`–`t4` before tuning 
 |----|------|-----------|
 | **M5-01** | Script or checklist: **30 utterances** (mix 3 / 10 / 25 words). | List stored in `docs/latency-log.md`. |
 | **M5-02** | Record p50 / p95 **perceived latency** (plan §2). | Table filled. |
-| **M5-03** | Verify criteria 3–7 (glitches, 10 min session, logging completeness). | Checklist in latency-log. |
+| **M5-03** | Verify criteria 3–7 (glitches, 10 min session, logging completeness). With `agent=brain`, every turn log includes `brain.route` and path-relevant DB timings. | Checklist in latency-log. |
 
 ### M5 — Tuning (one knob per step)
 
@@ -254,7 +360,15 @@ Build **latency observer early** (plan §6): you need `t0`–`t4` before tuning 
 | **M5-09** | Confirm server region + connection reuse; re-run; log. | Row in latency-log. |
 | **M5-10** | *(Optional Phase 1b)* Swap in WebRTC transport; compare p50/p95 to WebSocket. | Note in latency-log. |
 
-**Milestone 5 acceptance:** Plan §2 success table targets met or documented with reasons; `docs/latency-log.md` complete.
+### M5 — Brain / DB query performance
+
+| ID | Step | Done when |
+|----|------|-----------|
+| **M5-11** | **L1 ship:** 30-utterance E2E (L1 paraphrases + out-of-scope deflects); aggregate p50/p95 for `embed_ms`, `redis_knn_ms`, `brain_ms` by `route`. *(Deferred:* L2 routes + `qdrant_search_ms` / `llm_first_token_ms`.) | Table in `docs/latency-log.md`. |
+| **M5-12** | **L1 ship:** isolated Redis baseline from M4B-22; note docker vs host, variant count, embedding provider. Target: `redis_knn_ms` p95 **≤ 5 ms** local (excluding embed). *(Deferred:* Qdrant SLO.) | SLO row in latency-log. |
+| **M5-13** | Confirm L1 turns omit LLM (`llm_first_token_ms` absent); tie `brain_ms` + pipeline stages to perceived latency. *(Deferred:* L1 vs L2 comparison.) | Short note in latency-log. |
+
+**Milestone 5 acceptance:** Plan §2 success table targets met or documented; `docs/latency-log.md` complete for **L1 brain metrics (M5-11–M5-13 as scoped above)**. Full dual-layer tables when L2 is implemented.
 
 ---
 
@@ -284,8 +398,9 @@ M1-01 … M1-17   server pipeline + bench
 M2-01 … M2-14   client loopback
 M3-01 … M3-19   WebSocket E2E
 M4-01 … M4-11   barge-in + robustness
-M5-01 … M5-10   benchmark + tuning
+M4B-01 … M4B-22 knowledge brain (L1 Redis now; M4B-08–12 L2 deferred)
+M5-01 … M5-13   benchmark + tuning (+ DB query performance)
 M6-01 … M6-04   docs + DoD
 ```
 
-**Total:** 72 micro-steps (implement **one ID at a time**).
+**Total:** 94 micro-steps (implement **one ID at a time**).

@@ -1,11 +1,33 @@
+# Secrets
 .env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python
 __pycache__/
+*.py[cod]
 .venv/
 venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
 node_modules/
 dist/
-.DS_Store
+*.tsbuildinfo
 
-# Bench audio artifacts
-tmp/**/*.wav
-artifacts/**/*.wav
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+
+# Local benches, scratch, and exported chats
+tmp/
+artifacts/
+.scratch/
+cursor_voice_agent_chat_*.md

@@ -1,20 +1,18 @@
 # Voice agent server
 
-Python 3.11+ FastAPI app and Pipecat pipeline (Phase 1).
+Python 3.11+ FastAPI app and Pipecat pipeline. Setup for the whole repo, including the browser client, is in the [root README](../README.md).
+
+From this directory, after `pip install -e ".[dev]"` from the repo root (or `pip install -e ".[dev]"` here):
 
 ```bash
-# from repo root
-python -m venv .venv
-source .venv/bin/activate
-pip install -e server
+pytest
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Docker
+`app` is the installed package, so uvicorn can run from the repo root as well.
 
-From repo root:
+Docker, from the repo root:
 
 ```bash
 docker compose up --build
-# or: docker build -f server/Dockerfile -t voice-agent-server .
 ```

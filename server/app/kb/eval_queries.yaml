@@ -1,0 +1,97 @@
+- text: Where is my money?
+  in_scope: true
+  expected_faq_id: where_is_money
+
+- text: How do I check where my transfer is?
+  in_scope: true
+  expected_faq_id: where_is_money
+
+- text: Where can I check where my money is?
+  in_scope: true
+  expected_faq_id: where_is_money
+
+- text: How can I check my payment status?
+  in_scope: true
+  expected_faq_id: where_is_money
+
+- text: My recipient still has not received the transfer
+  in_scope: true
+  expected_faq_id: recipient_not_received
+
+- text: Why is my payment still not processing?
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: Why is my transfer still processing after two days?
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: It says sent but the recipient account is still empty
+  in_scope: true
+  expected_faq_id: sent_not_arrived
+
+- text: Can I download a transfer receipt as proof?
+  in_scope: true
+  expected_faq_id: proof_of_payment
+
+- text: Where do I find the transfer reference number?
+  in_scope: true
+  expected_faq_id: reference_number
+
+- text: I cancelled my transfer, when will I get my refund?
+  in_scope: true
+  expected_faq_id: transfer_cancelled
+
+- text: My transfer failed, do I get my money back?
+  in_scope: true
+  expected_faq_id: transfer_failed
+
+- text: Do you email me when the transfer is completed?
+  in_scope: true
+  expected_faq_id: check_by_email
+
+- text: Why is my payment not processed yet?
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: My payment is taking forever
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: Is it slower on weekends?
+  in_scope: true
+  expected_faq_id: still_processing
+
+- text: Can my recipient's bank trace the payment?
+  in_scope: true
+  expected_faq_id: sent_not_arrived
+
+- text: What are Wise transfer fees?
+  in_scope: false
+
+- text: What exchange rate are you using right now?
+  in_scope: false
+
+- text: I cannot log in to my account
+  in_scope: false
+
+- text: How do I reset my password?
+  in_scope: false
+
+- text: My card was charged twice, can you help?
+  in_scope: false
+
+- text: Can you help me create a new transfer?
+  in_scope: false
+
+- text: How do I verify my business account?
+  in_scope: false
+
+- text: What are your customer support hours?
+  in_scope: false
+
+- text: Is Wise available in my country?
+  in_scope: false
+
+- text: Can I talk to an agent now?
+  in_scope: false

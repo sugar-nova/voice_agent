@@ -1,0 +1,153 @@
+# Curated FAQ snapshot — Wise "where is my money" / sending (in-scope only).
+# Q->A format: embed question variants; return one voice-optimized answer payload.
+
+- id: where_is_money
+  category: tracking
+  tags: [tracking, status]
+  question: Where is my money?
+  embedded_questions:
+    - Where is my money?
+    - Where can I track my transfer?
+    - Where can I check where my money is?
+    - How do I check where my transfer is?
+    - How can I check my payment status?
+    - How can I see my transfer status?
+    - Where do I find my transfer progress in Wise?
+  answer: >-
+    Open your transfer in Activity in the Wise app or website. You will see the current
+    step and the latest estimated arrival time. If we need anything from you, it will
+    show there as a message.
+
+- id: recipient_not_received
+  category: recipient
+  tags: [recipient, delay]
+  question: My recipient has not received the money yet
+  embedded_questions:
+    - My recipient has not received the money yet
+    - Why has my recipient not got the money?
+    - The receiver still has not received my transfer
+    - Recipient did not get paid yet, what should I do?
+    - Money not in recipient account yet
+  answer: >-
+    Start by checking the transfer status in Activity. If it says sent, the recipient's
+    bank may still be processing it. Ask the recipient to confirm the account details,
+    and if needed share the transfer receipt reference so their bank can trace it.
+
+- id: how_long_transfer
+  category: timing
+  tags: [timing, estimate]
+  question: How long does my transfer take?
+  embedded_questions:
+    - How long does my transfer take?
+    - When will my money arrive?
+    - How much time does a Wise transfer need?
+    - Why is my transfer estimate changing?
+    - What is the delivery time for my transfer?
+  answer: >-
+    Transfer speed depends on your payment method, currency route, and bank processing.
+    Wise shows an estimate when you create the transfer and updates it in Activity.
+    Weekends and holidays can make it take longer.
+
+- id: still_processing
+  category: timing
+  tags: [processing, delay]
+  question: Why is my transfer still processing?
+  embedded_questions:
+    - Why is my transfer still processing?
+    - Why is my money taking so long?
+    - The tracker is stuck on processing, what does that mean?
+    - What is holding up my transfer?
+    - Why has my transfer not moved yet?
+    - Why is my payment still processing?
+  answer: >-
+    Processing usually means we are still converting funds, running checks, or waiting
+    for bank movement. It can also be slower on weekends or holidays. Check Activity and
+    your email in case we asked for extra details.
+
+- id: sent_not_arrived
+  category: recipient
+  tags: [sent, bank]
+  question: The transfer says sent but the money has not arrived
+  embedded_questions:
+    - The transfer says sent but the money has not arrived
+    - It says sent, why did the recipient not receive it?
+    - Wise marked my transfer as sent but no money yet
+    - What does sent mean if the money is not there?
+    - Transfer shows sent but recipient account is empty
+  answer: >-
+    Sent means Wise has passed the money to the recipient's bank. The bank may still
+    need extra time to credit the account. Ask the recipient to check with their bank
+    using the transfer reference from your receipt.
+
+- id: proof_of_payment
+  category: documents
+  tags: [proof, receipt]
+  question: Can I get proof of payment for my transfer?
+  embedded_questions:
+    - Can I get proof of payment for my transfer?
+    - How do I download a transfer receipt?
+    - Where can I find payment confirmation?
+    - I need proof I sent the money
+    - Can Wise give me a transfer receipt PDF?
+  answer: >-
+    Yes. Open the transfer in Activity and download the transfer receipt. You can share
+    that receipt as proof of payment with your recipient or their bank.
+
+- id: reference_number
+  category: documents
+  tags: [reference, tracking]
+  question: What is the reference number for my transfer?
+  embedded_questions:
+    - What is the reference number for my transfer?
+    - Where do I find my transfer reference?
+    - I need the payment reference for tracking
+    - Which reference should I share with the recipient bank?
+    - How can I locate my Wise transfer ID?
+  answer: >-
+    Each transfer has a reference in its details and receipt in Activity. Share that
+    reference with your recipient or their bank so they can trace the incoming payment.
+
+- id: transfer_cancelled
+  category: cancelled
+  tags: [cancelled, refund]
+  question: My transfer was cancelled where is the money
+  embedded_questions:
+    - My transfer was cancelled where is the money
+    - I cancelled my transfer, when do I get the money back?
+    - Cancelled transfer refund status
+    - What happens after I cancel a transfer?
+    - My cancelled transfer has not refunded yet
+  answer: >-
+    If a transfer is cancelled, any collected funds are returned to your Wise balance
+    or original payment source. Refund timing depends on the payment method and can take
+    a few business days.
+
+- id: transfer_failed
+  category: failed
+  tags: [failed, refund]
+  question: My transfer failed what happens to my money
+  embedded_questions:
+    - My transfer failed what happens to my money
+    - Failed transfer, will I get a refund?
+    - Why did my transfer fail and where is my money now?
+    - What happens if Wise transfer fails?
+    - Failed payment status and refund time
+  answer: >-
+    If a transfer fails, Wise does not complete payout to the recipient. Any collected
+    money is returned based on the failure reason shown in Activity. Some refunds may
+    take several business days, especially for bank transfers.
+
+- id: check_by_email
+  category: tracking
+  tags: [email, updates]
+  question: Will Wise email me when my money arrives
+  embedded_questions:
+    - Will Wise email me when my money arrives
+    - Do I get notified when transfer is complete?
+    - Will I get an email for transfer updates?
+    - How do I get alerts for transfer status changes?
+    - Can Wise notify me when recipient gets paid?
+  answer: >-
+    Wise sends email updates when your transfer status changes, such as sent or
+    completed. You can also enable app notifications. The live status is always visible
+    in Activity.

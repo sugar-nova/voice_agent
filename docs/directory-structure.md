@@ -1,54 +1,43 @@
-# Directory structure (Phase 1 — Echo agent)
-
-Pipeline this layout supports:
+# Directory structure
 
 ```
-[Browser Mic] ──PCM──> [Transport] ──> [Server: VAD → STT → Agent → TTS] ──> [Transport] ──> [Playback]
+[Browser Mic] ──PCM──> [WebSocket] ──> [Server: VAD → STT → Agent → TTS] ──> [WebSocket] ──> [Playback]
 ```
 
-STT and TTS run on the **server** (Pipecat pipeline). Provider choice (Deepgram first, others later) is configured in server settings and `pipeline.py`, not under `client/`.
-
-**Spec:** [phase1-plan.md §5](./phase1-plan.md#5-repository-structure)
+Speech-to-text and speech synthesis run on the server. Provider choice is configured with environment variables and `server/app/pipeline.py`.
 
 ## Top level
 
 | Path | Role |
 |------|------|
-| `client/` | Browser: mic/speaker worklets, transport, UI, client-side latency |
-| `server/` | FastAPI + Pipecat pipeline, agents, observers, tests |
-| `config/` | Environment templates and non-secret configuration |
-| `scripts/` | Provider checks, latency benches, dev helpers |
-| `docs/` | Architecture, phase plan, latency log |
+| `client/` | Browser mic, playback, transport, and debug UI |
+| `server/` | FastAPI app, Pipecat pipeline, agents, brain, tests |
+| `config/` | `config/.env.example` (copy to `config/.env`; never commit the copy) |
+| `scripts/` | Provider smoke test, latency benches, Redis index build, brain evals |
+| `docs/` | Architecture notes, FAQ scope, latency log |
 
 ## `client/`
 
 | Path | Role |
 |------|------|
-| `public/worklets/` | AudioWorklet processors (capture → PCM16, playback jitter buffer) |
-| `src/audio/` | Mic setup, `AudioContext`, worklet loading |
-| `src/transport/` | Transport interface; WebSocket (later WebRTC) |
-| `src/agent/` | Session orchestration (connect, state machine) |
-| `src/metrics/` | Client-side timing (e.g. first frame played) |
-| `src/ui/` | Controls, transcript, latency panel |
+| `public/worklets/` | AudioWorklet processors for capture and playback |
+| `src/audio/` | Microphone, PCM framing, capture, playback buffer |
+| `src/transport/` | WebSocket transport and message types |
+| `src/main.ts` | Session controls, transcript, and latency panel |
+| `vite.config.ts` | Dev server; proxies `/ws` to the API on port 8000 |
 
 ## `server/`
 
 | Path | Role |
 |------|------|
-| `app/` | FastAPI entry, pipeline assembly, config, schemas |
-| `app/agents/` | Turn logic (Phase 1: echo; later FAQ/search) |
-| `app/observers/` | Pipeline observers (e.g. per-turn latency JSON) |
-| `tests/` | Server unit/integration tests |
+| `app/main.py` | FastAPI app and `/ws` session entry |
+| `app/pipeline.py` | Pipecat pipeline: VAD, Deepgram, agent, Cartesia |
+| `app/agents/` | `echo` (repeat the transcript) and `knowledge` (FAQ brain) |
+| `app/brain/` | Embeddings, Redis Layer 1, Qdrant Layer 2, local LLM |
+| `app/kb/` | FAQ YAML and eval queries |
+| `app/observers/` | Per-turn latency log |
+| `tests/` | Pytest suite (`cd server && pytest`) |
 
-## Modular voice providers
+## Providers
 
-- **STT / TTS** are wired in `app/pipeline.py` via Pipecat service classes. Swap providers by changing factory/config (env + small adapter module), without touching client transport or agent UI.
-- **Phase 1 default:** Deepgram (STT) and Cartesia (TTS) per [phase1-plan.md](./phase1-plan.md).
-- **Agent logic** stays in `app/agents/` so echo can be replaced independently of STT/TTS vendors.
-
-## Removed (obsolete placeholders)
-
-- `core/` — agent logic lives under `server/app/agents/`
-- `server/src/` — replaced by `server/app/`
-- `client/src/speech/` — browser no longer hosts STT/TTS adapters in Phase 1
-- Root `tests/` — server tests live under `server/tests/` (client tests added with Vitest in later milestones)
+STT and TTS are Pipecat services constructed in `app/pipeline.py`. Swapping a vendor is a server change; the browser transport stays the same. The default is Deepgram for STT and Cartesia for TTS. Agent logic stays in `app/agents/`, so echo and the FAQ brain can change without touching audio capture.
